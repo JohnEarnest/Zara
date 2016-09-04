@@ -174,7 +174,7 @@ function getHandPosition(team, index) {
 	var height  = (TILE_SIZE + 5) * 6 - 5;
 	var width   = (TILE_SIZE + 5) * 3 - 5;
 	var hmargin = 10;
-	var vcenter = (SIZE_Y - height) / 2;
+	var vcenter = Math.floor((SIZE_Y - height) / 2);
 	var step    = TILE_SIZE + 5;
 	var px      = team == 'red' ? (SIZE_X - width - hmargin) : hmargin + width - step;
 	var py      = vcenter;
@@ -182,7 +182,7 @@ function getHandPosition(team, index) {
 
 	for (var x = 0; x < index; x++) {
 		r.y += step;
-		if (x == 5)  { r.x += (team == 'red') ? step : -step; r.y = py + (TILE_SIZE / 2); }
+		if (x == 5)  { r.x += (team == 'red') ? step : -step; r.y = py + Math.floor(TILE_SIZE / 2); }
 		if (x == 10) { r.x += (team == 'red') ? step : -step; r.y = py; }
 	}
 	return r;
@@ -462,6 +462,13 @@ var mouseX = -1;
 var mouseY = -1;
 
 function mouseMove(event) {
+	if (event.targetTouches) {
+		// adapt touch-drag events down to
+		// behave the same as mouse-drags:
+		if (selectedTile) { event.preventDefault(); }
+		event = event.targetTouches[0];
+		if (!event) { return; }
+	}
 	var rect = c.getBoundingClientRect();
 	mouseX = event.clientX - rect.left;
 	mouseY = event.clientY - rect.top;
@@ -497,6 +504,10 @@ function inputHandlers() {
 	c.addEventListener("mousedown",   mouseDown, false);
 	c.addEventListener("mouseup"  ,   mouseUp,   false);
 	c.addEventListener("mouseout",    mouseUp,   false);
+	
+	c.addEventListener("touchstart",  mouseDown, false);
+	c.addEventListener("touchend",    mouseUp,   false);
+	c.addEventListener("touchmove",   mouseMove, false);
 }
 
 function tap(team) {
