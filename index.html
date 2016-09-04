@@ -1,0 +1,41 @@
+<html>
+	<head>
+		<title>Zara</title>
+		<style>
+			canvas {
+				image-rendering: optimizeSpeed;
+				image-rendering: -moz-crisp-edges;
+				image-rendering: -webkit-optimize-contrast;
+				image-rendering: optimize-contrast;
+				-ms-interpolation-mode: nearest-neighbor;
+			}
+		</style>
+	</head>
+
+	<body>
+		<canvas id="target" width="800px" height="480px"></canvas>
+		<script src="randomai.js"></script>
+		<script src="zara.js"></script>
+
+		<h2>Zara</h2>
+		<p>
+			This game is a simplified reimplementation of a shareware title called <i>Zarathustra</i>.
+			Find out more on <a href="https://github.com/JohnEarnest/Zara">GitHub</a>.
+		</p>
+		<p>
+			Players take turns dragging tiles onto the board.
+			The edges of a tile are shields, spears or blank.
+			Tiles may be rotated by clicking on them.
+			When a player runs out of tiles or empty spaces on the board,
+			the game ends and players earn points for each blank edge of their tiles on the board.
+		</p>
+		<p>
+			When a tile is played, the edges of tiles which touch are compared.
+			If a spear is adjacent to a blank edge, the tile with the blank edge is removed.
+			If a spear is adjacent to a spear, count up the number of shields facing each tile-
+			The tile surrounded by fewer shields is removed, or both are removed on a tie.
+			If a tile is played and survives this process, tiles may not be played on any of the 8
+			surrounding spaces on the next player's turn.
+		</p>
+	</body>
+</html>
