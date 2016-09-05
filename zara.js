@@ -19,9 +19,10 @@ var TILE_COUNT = 9;
 var BOARD_X = 5;
 var BOARD_Y = 5;
 
-var tileColor   = '#EEEEEE';
-var tileOutline = '#000000';
-var blockColor  = '#CCCCCC';
+var tileColor     = '#EEEEEE';
+var tileHighlight = '#FFAA00';
+var tileOutline   = '#000000';
+var blockColor    = '#CCCCCC';
 
 var DIR_N = 0;
 var DIR_E = 1;
@@ -50,11 +51,15 @@ function sum(x, y)  { return x + y; }
 function notNull(x) { return x != null; }
 function isNull(x)  { return x == null; }
 
-function inTile(pos, mx, my) {
+function inBox(pos, w, h, mx, my) {
 	return !((mx < pos.x) ||
 		     (my < pos.y) ||
-		     (mx > pos.x + TILE_SIZE) ||
-		     (my > pos.y + TILE_SIZE));
+		     (mx > pos.x + w) ||
+		     (my > pos.y + h));
+}
+
+function inTile(pos, mx, my) {
+	return inBox(pos, TILE_SIZE, TILE_SIZE, mx, my);
 }
 
 ////////////////////////////////////////////////////////
@@ -90,7 +95,9 @@ function drawTile(t, pos) {
 	else {
 		// background
 		g.beginPath();
-		g.fillStyle = (t == null) ? 'white' : tileColor;
+		g.fillStyle = (t == null)         ? 'white' :
+		              (t == selectedTile) ? tileHighlight :
+		              tileColor;
 		g.rect(0, 0, TILE_SIZE, TILE_SIZE);
 		g.fill();
 
@@ -505,6 +512,7 @@ function mouseMove(event) {
 	var rect = c.getBoundingClientRect();
 	mouseX = event.clientX - rect.left;
 	mouseY = event.clientY - rect.top;
+	if (gameMachine[gameState.mode]['click']); { repaint(); }
 	if (!selectedTile) { return; }
 	var handler = gameMachine[gameState.mode]['drag'];
 	if (handler) { handler(); }
@@ -524,6 +532,10 @@ function mouseDown(event)  {
 function mouseUp(event) {
 	dragging = false;
 	mouseMove(event);
+	var clicker = gameMachine[gameState.mode]['click'];
+	if (clicker) {
+		clicker(gameState);
+	}
 	if (selectedTile) {
 		var handler = gameMachine[gameState.mode]['drop'];
 		if (handler) { handler(); }
@@ -541,10 +553,6 @@ function inputHandlers() {
 	c.addEventListener("touchstart",  mouseDown, false);
 	c.addEventListener("touchend",    mouseUp,   false);
 	c.addEventListener("touchmove",   mouseMove, false);
-}
-
-function tap(team) {
-	console.log(tapped);
 }
 
 function grab(team) {
@@ -580,12 +588,72 @@ function drop(team) {
 
 ////////////////////////////////////////////////////////
 //
+//  Opponent Menu
+//
+////////////////////////////////////////////////////////
+
+var opponents = [
+	new RandomAI('blue'),
+	new MaxineAI('blue'),
+];
+
+var ai = null;
+
+var OPP_BUTTON_W   = 300;
+var OPP_BUTTON_H   =  40;
+var OPP_BUTTON_PAD =   5;
+
+function getOpponentPosition(index) {
+	var height = (OPP_BUTTON_H + OPP_BUTTON_PAD) * opponents.length - OPP_BUTTON_PAD;
+	return pos(
+		(SIZE_X - OPP_BUTTON_W) / 2,
+		(SIZE_Y - height) / 2 + (OPP_BUTTON_H + OPP_BUTTON_PAD) * index
+	);
+}
+
+function drawOpponentMenu() {
+	g.fillStyle = 'white';
+	g.fillRect(0, 0, SIZE_X, SIZE_Y);
+
+	g.save();
+	g.translate(0.5, 0.5);
+	opponents.map(function(o, i) {
+		g.save();
+		var p = getOpponentPosition(i);
+		g.translate(p.x, p.y);
+
+		var over = inBox(p, OPP_BUTTON_W, OPP_BUTTON_H, mouseX, mouseY);
+
+		g.beginPath();
+		g.fillStyle = over ? tileHighlight : tileColor;
+		g.strokeStyle = tileOutline;
+		g.rect(0, 0, OPP_BUTTON_W, OPP_BUTTON_H);
+		g.fill();
+		g.stroke();
+
+		g.fillStyle    = tileOutline;
+		g.textAlign    = 'center';
+		g.textBaseline = 'middle';
+		g.font         = '15px Helvetica';
+		g.fillText(
+			o.name,
+			(OPP_BUTTON_W / 2),
+			(OPP_BUTTON_H / 2)
+		);
+
+		g.restore();
+	});
+	g.restore();
+}
+
+////////////////////////////////////////////////////////
+//
 //  Main Program
 //
 ////////////////////////////////////////////////////////
 
 var gameState = {
-	mode: 'red_turn',
+	mode: 'opp_menu',
 	board: newBoard(),
 	hands: {
 		'red'  : newTiles('red'),
@@ -593,10 +661,21 @@ var gameState = {
 	},
 };
 
-// var ai = new RandomAI('blue');
-var ai = new MaxineAI('blue');
-
 var gameMachine = {
+	'opp_menu' : {
+		draw: function() {
+			drawOpponentMenu();
+			drawHeading("Choose an Opponent:");
+		},
+		click: function(state) {
+			opponents.forEach(function(o, i) {
+				if (inBox(getOpponentPosition(i), OPP_BUTTON_W, OPP_BUTTON_H, mouseX, mouseY)) {
+					ai = o;
+					state.mode = 'red_turn';
+				}
+			});
+		},
+	},
 	'red_turn' : {
 		grab: grab.bind(this, 'red'),
 		drop: drop.bind(this, 'red'),

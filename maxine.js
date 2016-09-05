@@ -69,7 +69,7 @@ function MaxineAI(team) {
 	this.consider = function(state, team) {
 		// start with a wild guess
 		var best      = this.randomMove(state, team);
-		var bestval   = -1;
+		var bestval   = 0; // really bad moves may have a negative value.
 		var trials    = 0;
 		var startTime = new Date().getTime();
 
