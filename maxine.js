@@ -36,16 +36,23 @@ function MaxineAI(team) {
 			value += (nowMe - prevMe) * this.SCORE_REWARD;
 		}
 
+		// examine the neighbors of the tile we placed.
+		var edges = [
+			edgesIn(state.board, lastMove, 0),
+			edgesIn(state.board, lastMove, 1),
+			edgesIn(state.board, lastMove, 2),
+			edgesIn(state.board, lastMove, 3),
+		];
+
 		// prefer edges of the board; those spaces are easier to defend:
 		if (lastMove.x == 0 || lastMove.y == 0 || lastMove.x == BOARD_X-1 || lastMove.y == BOARD_Y-1) {
 			value += this.EDGE_REWARD;
 
 			// it's ideal to make the blank edges of our pieces face the edges of the board:
-			var p = pos(lastMove.x, lastMove.y);
-			if (lastMove.y == 0         && edgesIn(state.board, p, 0).out == 'blank') { value += this.EDGE_DEFENSE; }
-			if (lastMove.x == BOARD_X-1 && edgesIn(state.board, p, 1).out == 'blank') { value += this.EDGE_DEFENSE; }
-			if (lastMove.y == BOARD_Y-1 && edgesIn(state.board, p, 2).out == 'blank') { value += this.EDGE_DEFENSE; }
-			if (lastMove.x == 0         && edgesIn(state.board, p, 3).out == 'blank') { value += this.EDGE_DEFENSE; }
+			if (lastMove.y == 0         && edges[0].out == 'blank') { value += this.EDGE_DEFENSE; }
+			if (lastMove.x == BOARD_X-1 && edges[1].out == 'blank') { value += this.EDGE_DEFENSE; }
+			if (lastMove.y == BOARD_Y-1 && edges[2].out == 'blank') { value += this.EDGE_DEFENSE; }
+			if (lastMove.x == 0         && edges[3].out == 'blank') { value += this.EDGE_DEFENSE; }
 		}
 
 		// add some random fuzz to make things less predictable:
@@ -74,33 +81,25 @@ function MaxineAI(team) {
 		var startTime = new Date().getTime();
 
 		// brute-force search for the maximum-valued move
-		state.hands[team].filter(notNull).forEach(function(tile) {
-			var originalRot = tile.rot;
-			dirs.forEach(function(rot) {
-				tile.rot = rot;
-				emptyPositions(state.board).forEach(function(pos) {
+		forMoves(state, team, function(tile, rot, pos) {
+			// evaluateMove modifies in place, so defensively copy
+			var nextState = evaluateMove(copyState(state), tile, pos);
+			trials++;
 
-					// evaluateMove modifies in place, so defensively copy
-					var nextState = evaluateMove(copyState(state), tile, pos);
-					trials++;
+			var thisMove = {
+				x    : pos.x,
+				y    : pos.y,
+				tile : tile,
+				rot  : rot,
+			};
 
-					var thisMove = {
-						x    : pos.x,
-						y    : pos.y,
-						tile : tile,
-						rot  : rot,
-					};
+			// prefer better moves (duh)
+			var value = this.moveValue(state, nextState, thisMove);
+			if (value > bestval) {
+				bestval = value;
+				best    = thisMove;
+			}
 
-					// prefer better moves (duh)
-					var value = this.moveValue(state, nextState, thisMove);
-					if (value > bestval) {
-						bestval = value;
-						best    = thisMove;
-					}
-
-				}.bind(this));
-			}.bind(this));
-			tile.rot = originalRot;
 		}.bind(this));
 
 		var endTime = new Date().getTime();

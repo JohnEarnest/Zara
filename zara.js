@@ -463,16 +463,16 @@ function chooseRandom(list) {
 	return list[Math.floor(Math.random() * list.length)];
 }
 
-function copyBoard(board) {
-	var r = newBoard();
-	forBoard(board, function(t, pos) { set(r, pos, t); })
-	return r;
-};
-
 function copyState(state) {
 	// note that this only performs a shallow copy
 	// of tiles themselves; be careful not to screw
 	// up their rotation values!
+
+	function copyBoard(board) {
+		var r = newBoard();
+		forBoard(board, function(t, pos) { set(r, pos, t); })
+		return r;
+	}
 	return {
 		mode  : state.mode,
 		board : copyBoard(state.board),
@@ -485,6 +485,19 @@ function copyState(state) {
 
 function otherTeam(team) {
 	return team == 'red' ? 'blue' : 'red';
+}
+
+function forMoves(state, team, f) {
+	state.hands[team].filter(notNull).forEach(function(tile) {
+		var originalRot = tile.rot;
+		dirs.forEach(function(rot) {
+			tile.rot = rot;
+			emptyPositions(state.board).forEach(function(pos) {
+				f(tile, rot, pos);
+			});
+		});
+		tile.rot = originalRot;
+	});
 }
 
 ////////////////////////////////////////////////////////
