@@ -520,6 +520,7 @@ function mouseMove(event) {
 }
 
 function mouseDown(event)  {
+	event.preventDefault();
 	dragging = true;
 	mouseMove(event);
 	if (!selectedTile) {
