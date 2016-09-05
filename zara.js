@@ -43,7 +43,6 @@ var ortho = [
 
 var tiles = new Image();
 tiles.onload = init;
-tiles.crossOrigin = "Anonymous";
 tiles.src = 'icons.png';
 
 function pos(x, y)  { return { x : x, y : y }; }
@@ -449,6 +448,40 @@ function playMove(tile, pos) {
 
 ////////////////////////////////////////////////////////
 //
+//  AI Helpers
+//
+////////////////////////////////////////////////////////
+
+function chooseRandom(list) {
+	return list[Math.floor(Math.random() * list.length)];
+}
+
+function copyBoard(board) {
+	var r = newBoard();
+	forBoard(board, function(t, pos) { set(r, pos, t); })
+	return r;
+};
+
+function copyState(state) {
+	// note that this only performs a shallow copy
+	// of tiles themselves; be careful not to screw
+	// up their rotation values!
+	return {
+		mode  : state.mode,
+		board : copyBoard(state.board),
+		hands : {
+			'red'  : state.hands.red.slice(0),
+			'blue' : state.hands.blue.slice(0),
+		},
+	};
+}
+
+function otherTeam(team) {
+	return team == 'red' ? 'blue' : 'red';
+}
+
+////////////////////////////////////////////////////////
+//
 //  Input Handlers
 //
 ////////////////////////////////////////////////////////
@@ -555,12 +588,13 @@ var gameState = {
 	mode: 'red_turn',
 	board: newBoard(),
 	hands: {
-		red  : newTiles('red'),
-		blue : newTiles('blue'),
+		'red'  : newTiles('red'),
+		'blue' : newTiles('blue'),
 	},
 };
 
-var ai = new RandomAI('blue');
+// var ai = new RandomAI('blue');
+var ai = new MaxineAI('blue');
 
 var gameMachine = {
 	'red_turn' : {
