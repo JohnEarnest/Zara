@@ -37,12 +37,7 @@ function MaxineAI(team) {
 		}
 
 		// examine the neighbors of the tile we placed.
-		var edges = [
-			edgesIn(state.board, lastMove, 0),
-			edgesIn(state.board, lastMove, 1),
-			edgesIn(state.board, lastMove, 2),
-			edgesIn(state.board, lastMove, 3),
-		];
+		var edges = dirs.map(edgesIn.bind(this, state.board, lastMove));
 
 		// prefer edges of the board; those spaces are easier to defend:
 		if (lastMove.x == 0 || lastMove.y == 0 || lastMove.x == BOARD_X-1 || lastMove.y == BOARD_Y-1) {

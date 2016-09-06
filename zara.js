@@ -163,15 +163,16 @@ function getBoardPosition(p) {
 	);
 }
 
+function drawOne(background, t, pos) {
+	g.save();
+	var tpos = getBoardPosition(pos);
+	g.translate(tpos.x, tpos.y);
+	if (background) { drawTile(null); }
+	else if (t) { drawTile(t, pos); }
+	g.restore();
+};
+
 function drawBoard(gameState) {
-	function drawOne(background, t, pos) {
-		g.save();
-		var tpos = getBoardPosition(pos);
-		g.translate(tpos.x, tpos.y);
-		if (background) { drawTile(null); }
-		else if (t) { drawTile(t, pos); }
-		g.restore();
-	};
 	forBoard(gameState.board, drawOne.bind(this, true));
 	forBoard(gameState.board, drawOne.bind(this, false));
 }
@@ -441,15 +442,70 @@ function evaluateMove(state, tile, pos) {
 }
 
 function playMove(tile, pos) {
+	prevState = copyState(gameState);
 	gameState = evaluateMove(gameState, tile, pos);
 
 	// advance the state machine:
 	if (isGameOver(gameState)) {
-		gameState.mode = 'game_over';
+		gameState.mode = 'end_anim';
 	}
 	else {
 		gameState = gameMachine[gameState.mode]['next'](gameState);
-		gameState = gameMachine[gameState.mode]['init'](gameState);
+	}
+}
+
+////////////////////////////////////////////////////////
+//
+//  Turn Animation
+//
+////////////////////////////////////////////////////////
+
+var tweenPercent = 0;
+var tweening = false;
+
+function beginTween(state) {
+	tweenPercent = 0;
+	tweening = true;
+	return state;
+}
+
+function drawTween() {
+	if (!tweening) { return; }
+
+	g.fillStyle = 'white';
+	g.fillRect(0, 0, SIZE_X, SIZE_Y);
+	drawHand(gameState, 'red');
+	drawHand(gameState, 'blue');
+
+	forBoard(gameState.board, drawOne.bind(this, true));
+	forBoard(prevState.board, function(t, pos) {
+		var old = t;
+		var now = get(gameState.board, pos);
+
+		if ((old != null) && (now == null || now.isBlock)) {
+			// destroyed tiles are faded out
+			g.save();
+			g.globalAlpha = (1 - tweenPercent);
+			drawOne(false, old, pos);
+			g.restore();
+		}
+		else if ((old == null) && (now != null)) {
+			// played tiles are drawn normally (for now)
+			drawOne(false, now, pos);
+		}
+		else {
+			// everything else is treated normally
+			drawOne(false, now, pos);
+		}
+	});
+
+	if (tweenPercent < 1) {
+		tweenPercent = Math.min(1, tweenPercent + .1);
+		window.setTimeout(drawTween, 100);
+	}
+	else {
+		tweening = false;
+		gameMachine[gameState.mode]['next'](gameState);
 	}
 }
 
@@ -525,11 +581,11 @@ function mouseMove(event) {
 	var rect = c.getBoundingClientRect();
 	mouseX = event.clientX - rect.left;
 	mouseY = event.clientY - rect.top;
-	if (gameMachine[gameState.mode]['click']); { repaint(); }
+	if (gameMachine[gameState.mode]['click'] && !tweening); { repaint(); }
 	if (!selectedTile) { return; }
 	var handler = gameMachine[gameState.mode]['drag'];
 	if (handler) { handler(); }
-	repaint();
+	if (!tweening) { repaint(); }
 }
 
 function mouseDown(event)  {
@@ -539,7 +595,7 @@ function mouseDown(event)  {
 	if (!selectedTile) {
 		var handler = gameMachine[gameState.mode]['grab'];
 		if (handler) { handler(); }
-		repaint();
+		if (!tweening) { repaint(); }
 	}
 }
 
@@ -554,7 +610,7 @@ function mouseUp(event) {
 		var handler = gameMachine[gameState.mode]['drop'];
 		if (handler) { handler(); }
 	}
-	repaint();
+	if (!tweening) { repaint(); }
 }
 
 function inputHandlers() {
@@ -666,6 +722,7 @@ function drawOpponentMenu() {
 //
 ////////////////////////////////////////////////////////
 
+var prevState = null;
 var gameState = {
 	mode: 'opp_menu',
 	board: newBoard(),
@@ -674,6 +731,14 @@ var gameState = {
 		'blue' : newTiles('blue'),
 	},
 };
+
+function stepTo(mode, state) {
+	state.mode = mode;
+	var init = gameMachine[state.mode]['init'];
+	if (init) { state = init(state); }
+	repaint();
+	return state;
+}
 
 var gameMachine = {
 	'opp_menu' : {
@@ -693,17 +758,16 @@ var gameMachine = {
 	'red_turn' : {
 		grab: grab.bind(this, 'red'),
 		drop: drop.bind(this, 'red'),
-		init: function(state) {
-			return state;
-		},
 		draw: function() {
 			drawGame();
 			drawHeading("Player's Turn");
 		},
-		next: function(state) {
-			state.mode = 'blue_turn';
-			return state;
-		},
+		next: stepTo.bind(this, 'red_anim'),
+	},
+	'red_anim' : {
+		init: beginTween,
+		draw: drawTween,
+		next: stepTo.bind(this, 'blue_turn'),
 	},
 	'blue_turn' : {
 		init: function(state) {
@@ -713,7 +777,6 @@ var gameMachine = {
 				if (tileIndex < 0) { throw new Error("bogus tile selected by AI."); }
 				state.hands['blue'][tileIndex] = null;
 				playMove(move.tile, pos(move.x, move.y));
-				repaint();
 			}, 1500);
 			return state;
 		},
@@ -721,15 +784,19 @@ var gameMachine = {
 			drawGame();
 			drawHeading(ai.name + "'s Turn");
 		},
-		next: function(state) {
-			state.mode = 'red_turn';
-			return state;
-		},
+		next: stepTo.bind(this, 'blue_anim'),
+	},
+	'blue_anim' : {
+		init: beginTween,
+		draw: drawTween,
+		next: stepTo.bind(this, 'red_turn'),
+	},
+	'end_anim' : {
+		init: beginTween,
+		draw: drawTween,
+		next: stepTo.bind(this, 'game_over'),
 	},
 	'game_over' : {
-		init: function(state) {
-			return state;
-		},
 		draw: function() {
 			drawGame();
 			var red  = score(gameState.board, 'red');
