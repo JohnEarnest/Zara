@@ -46,10 +46,11 @@ var tiles = new Image();
 tiles.onload = init;
 tiles.src = 'icons.png';
 
-function pos(x, y)  { return { x : x, y : y }; }
-function sum(x, y)  { return x + y; }
-function notNull(x) { return x != null; }
-function isNull(x)  { return x == null; }
+function pos(x, y)   { return { x : x, y : y }; }
+function poseq(a, b) { return a.x == b.x && a.y == b.y; }
+function sum(x, y)   { return x + y; }
+function notNull(x)  { return x != null; }
+function isNull(x)   { return x == null; }
 
 function inBox(pos, w, h, mx, my) {
 	return !((mx < pos.x) ||
@@ -442,6 +443,7 @@ function evaluateMove(state, tile, pos) {
 }
 
 function playMove(tile, pos) {
+	prevMove  = { tile: tile, pos: pos };
 	prevState = copyState(gameState);
 	gameState = evaluateMove(gameState, tile, pos);
 
@@ -476,28 +478,45 @@ function drawTween() {
 	g.fillRect(0, 0, SIZE_X, SIZE_Y);
 	drawHand(gameState, 'red');
 	drawHand(gameState, 'blue');
-
 	forBoard(gameState.board, drawOne.bind(this, true));
-	forBoard(prevState.board, function(t, pos) {
-		var old = t;
-		var now = get(gameState.board, pos);
 
-		if ((old != null) && (now == null || now.isBlock)) {
-			// destroyed tiles are faded out
+	function drawTile(tile, pos) {
+		if (tile != null && tile.isBlock) { return; }
+		drawOne(false, tile, pos);
+	}
+
+	if (tweenPercent < .5) {
+		forBoard(prevState.board, function(t, pos) {
+			var old    = t;
+			var now    = get(gameState.board, pos);
+			var dead   = (now == null) || (now.isBlock);
+			var fizzle = poseq(pos, prevMove.pos) && dead;
+			var killed = (old != null) && (!old.isBlock) && dead;
+
+			if (fizzle || killed) {
+				// destroyed tiles are faded out
+				g.save();
+				g.globalAlpha = (1 - tweenPercent * 2);
+				drawTile(old || prevMove.tile, pos);
+				g.restore();
+			}
+			else {
+				// everything else is treated normally
+				drawTile(now, pos);
+			}
+		});
+	}
+	else {
+		// fade up blocks
+		forBoard(gameState.board, function(t, pos) {
 			g.save();
-			g.globalAlpha = (1 - tweenPercent);
-			drawOne(false, old, pos);
-			g.restore();
-		}
-		else if ((old == null) && (now != null)) {
-			// played tiles are drawn normally (for now)
-			drawOne(false, now, pos);
-		}
-		else {
-			// everything else is treated normally
-			drawOne(false, now, pos);
-		}
-	});
+			if (t != null && t.isBlock) {
+				g.globalAlpha = (tweenPercent - .5) * 2;
+			}
+			drawOne(false, t, pos);
+			g.restore()
+		});
+	}
 
 	if (tweenPercent < 1) {
 		tweenPercent = Math.min(1, tweenPercent + .1);
@@ -723,6 +742,7 @@ function drawOpponentMenu() {
 ////////////////////////////////////////////////////////
 
 var prevState = null;
+var prevMove  = null;
 var gameState = {
 	mode: 'opp_menu',
 	board: newBoard(),
