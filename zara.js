@@ -449,7 +449,7 @@ function playMove(tile, pos) {
 
 	// advance the state machine:
 	if (isGameOver(gameState)) {
-		gameState.mode = 'end_anim';
+		gameState = stepTo('end_anim', gameState);
 	}
 	else {
 		gameState = gameMachine[gameState.mode]['next'](gameState);
@@ -684,6 +684,7 @@ function drop(team) {
 var opponents = [
 	new RandomAI('blue'),
 	new MaxineAI('blue'),
+	{ name: "Human" },
 ];
 
 var ai = null;
@@ -769,6 +770,13 @@ var gameMachine = {
 		click: function(state) {
 			opponents.forEach(function(o, i) {
 				if (inBox(getOpponentPosition(i), OPP_BUTTON_W, OPP_BUTTON_H, mouseX, mouseY)) {
+					if (o.name == 'Human') {
+						o.name = 'Blue';
+						gameMachine['red_turn'].draw = function(){ drawGame(); drawHeading("Red's Turn"); }
+						gameMachine['blue_turn'].grab = grab.bind(this, 'blue');
+						gameMachine['blue_turn'].drop = drop.bind(this, 'blue');
+						gameMachine['blue_turn'].init = null;
+					}
 					ai = o;
 					state.mode = 'red_turn';
 				}
@@ -817,6 +825,7 @@ var gameMachine = {
 		next: stepTo.bind(this, 'game_over'),
 	},
 	'game_over' : {
+		init: repaint,
 		draw: function() {
 			drawGame();
 			var red  = score(gameState.board, 'red');
