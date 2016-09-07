@@ -206,8 +206,8 @@ function drawHand(gameState, team) {
 	});
 
 	g.save();
-	var spos = getHandPosition(team, 16);
-	g.translate(spos.x, spos.y);
+	var spos = getHandPosition(team, 6);
+	g.translate(spos.x, spos.y - TILE_SIZE);
 	drawInfo(score(gameState.board, team), team);
 	g.restore();
 }
@@ -245,6 +245,7 @@ var types = [
 	{ atk: [0, 0, 0, 0], def: [1, 1, 0, 0] },
 	{ atk: [1, 0, 0, 0], def: [0, 1, 0, 0] },
 	{ atk: [0, 1, 0, 0], def: [1, 0, 0, 0] },
+	{ atk: [1, 0, 0, 0], def: [0, 0, 1, 0] },
 	{ atk: [1, 0, 1, 0], def: [0, 0, 0, 0] },
 	{ atk: [0, 0, 0, 0], def: [1, 0, 1, 0] },
 	{ atk: [1, 1, 0, 0], def: [0, 0, 1, 0] },
