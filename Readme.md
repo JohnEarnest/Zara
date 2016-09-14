@@ -6,7 +6,7 @@ Zara
 
 > Zarathustra is a completely original strategy game for 2-4 players who attempt to dominate the playing field with specially-designed tiles marked with swords and shields. Swords attack other tiles, and shields protect tiles from others' attacks. But watch out -- your shields could protect other players' tiles, and your swords could destroy your own tiles. This isn't Mahjongg, folks. It's war.
 
-I stumbled across the game in an old shareware CD and I was surprised at its depth and elegance, so I decided to try to recreate it for a modern audience. I managed to contact Mark, and he graciously agreed to place the original game and its rules under a Creative Commons license- see below.  Some comments from mark about the creation of _Zarathustra_:
+I stumbled across the game in an old shareware CD and I was surprised at its depth and elegance, so I decided to try to recreate it for a modern audience. I managed to contact Mark, and he graciously agreed to place the original game and its rules under a Creative Commons license- see below.  Some comments from Mark about the creation of _Zarathustra_:
 
 > I do not really consider myself to have been much of a shareware author. This was simply something I wrote to practice Visual Basic, which I later came to abhor, then released it to see what would happen. I do not remember ever actually getting any revenue from it, but I did not really care.
 >

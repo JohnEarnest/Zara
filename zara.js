@@ -42,9 +42,19 @@ var ortho = [
 	[-1, 0],
 ];
 
-var tiles = new Image();
-tiles.onload = init;
-tiles.src = 'icons.png';
+var gfx = {};
+
+function loadGraphics(images, onready) {
+	var pending = images.length;
+	images.forEach(function(i) {
+		gfx[i] = new Image();
+		gfx[i].onload = function() {
+			pending--;
+			if (pending <= 0) { onready(); }
+		}
+		gfx[i].src = i;
+	});
+}
 
 function pos(x, y)   { return { x : x, y : y }; }
 function poseq(a, b) { return a.x == b.x && a.y == b.y; }
@@ -73,7 +83,8 @@ var c = document.getElementById('target');
 var g = c.getContext('2d');
 
 function drawSprite(x, y, c, i) {
-	g.drawImage(tiles,
+	g.drawImage(
+		gfx['icons.png'],
 		i * TILE_SIZE, c * TILE_SIZE, TILE_SIZE, TILE_SIZE, // src
 		x,             y,             TILE_SIZE, TILE_SIZE  // dst
 	);
@@ -846,3 +857,5 @@ function init() {
 	inputHandlers();
 	repaint();
 }
+
+loadGraphics(['icons.png'], init);
