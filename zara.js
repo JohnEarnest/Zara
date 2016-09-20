@@ -11,10 +11,9 @@
 
 "use strict";
 
-var SIZE_X     = 800;
-var SIZE_Y     = 480;
-var TILE_SIZE  = 64;
-var TILE_COUNT = 9;
+var SIZE_X    = 800;
+var SIZE_Y    = 480;
+var TILE_SIZE = 64;
 
 var BOARD_X = 5;
 var BOARD_Y = 5;
@@ -42,20 +41,6 @@ var ortho = [
 	[-1, 0],
 ];
 
-var gfx = {};
-
-function loadGraphics(images, onready) {
-	var pending = images.length;
-	images.forEach(function(i) {
-		gfx[i] = new Image();
-		gfx[i].onload = function() {
-			pending--;
-			if (pending <= 0) { onready(); }
-		}
-		gfx[i].src = i;
-	});
-}
-
 function pos(x, y)   { return { x : x, y : y }; }
 function poseq(a, b) { return a.x == b.x && a.y == b.y; }
 function sum(x, y)   { return x + y; }
@@ -81,13 +66,52 @@ function inTile(pos, mx, my) {
 
 var c = document.getElementById('target');
 var g = c.getContext('2d');
+var gfx = {};
 
-function drawSprite(x, y, c, i) {
+function loadGraphics(images, onready) {
+	var pending = images.length;
+	images.forEach(function(i) {
+		gfx[i] = new Image();
+		gfx[i].onload = function() {
+			pending--;
+			if (pending <= 0) { onready(); }
+		}
+		gfx[i].src = i;
+	});
+}
+
+function drawRotated(sheet, tile, dir, w, h, x, y) {
+	g.save();
+	g.translate(x, y);
+	switch(dir) {
+		case 0:
+			// nothing to do.
+			break;
+		case 1:
+			g.rotate(0.5 * Math.PI);
+			g.translate(0, -h);
+			break;
+		case 2:
+			g.rotate(1.0 * Math.PI);
+			g.translate(-w, -h);
+			break;
+		case 3:
+			g.rotate(1.5 * Math.PI);
+			g.translate(-w, 0);
+			break;
+		default:
+			throw new Error("invalid tile rotation");
+	}
+	var ix = Math.floor(gfx[sheet].width  / w);
+	var iy = Math.floor(gfx[sheet].height / h);
+	var tx = Math.floor(tile % ix) * w;
+	var ty = Math.floor(tile / ix) * h;
 	g.drawImage(
-		gfx['icons.png'],
-		i * TILE_SIZE, c * TILE_SIZE, TILE_SIZE, TILE_SIZE, // src
-		x,             y,             TILE_SIZE, TILE_SIZE  // dst
+		gfx[sheet],
+		tx, ty, w, h, // src
+		 0,  0, w, h  // dst
 	);
+	g.restore();
 }
 
 function drawTile(t, pos) {
@@ -133,10 +157,15 @@ function drawTile(t, pos) {
 		'black' : 0,
 		'red'   : 1,
 		'blue'  : 2,
+		'green' : 3,
 	};
 	dirs.forEach(function(d) {
-		if (t.atk[(d + t.rot) % 4]) { drawSprite(0, 0, teams[t.team], d); }
-		if (t.def[(d + t.rot) % 4]) { drawSprite(0, 0, teams[t.team], d + 4); }
+		if (t.atk[(d + t.rot) % 4]) {
+			drawRotated('icons.png', teams[t.team]*2,   d, TILE_SIZE, TILE_SIZE, 0, 0);
+		}
+		if (t.def[(d + t.rot) % 4]) {
+			drawRotated('icons.png', teams[t.team]*2+1, d, TILE_SIZE, TILE_SIZE, 0, 0);
+		}
 	});
 }
 
