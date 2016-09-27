@@ -76,7 +76,7 @@ function loadGraphics(images, onready) {
 			pending--;
 			if (pending <= 0) { onready(); }
 		}
-		gfx[i].src = i;
+		gfx[i].src = 'images/' + i;
 	});
 }
 
