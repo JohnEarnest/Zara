@@ -18,6 +18,7 @@ var TILE_SIZE = 64;
 var BOARD_X = 5;
 var BOARD_Y = 5;
 
+var backColor     = '#FFFFFF';
 var tileColor     = '#EEEEEE';
 var tileHighlight = '#FFAA00';
 var tileOutline   = '#000000';
@@ -47,15 +48,15 @@ function sum(x, y)   { return x + y; }
 function notNull(x)  { return x != null; }
 function isNull(x)   { return x == null; }
 
-function inBox(pos, w, h, mx, my) {
-	return !((mx < pos.x) ||
-		     (my < pos.y) ||
-		     (mx > pos.x + w) ||
-		     (my > pos.y + h));
+function inBox(pos, w, h, t) {
+	return !((t.x < pos.x) ||
+		     (t.y < pos.y) ||
+		     (t.x > pos.x + w) ||
+		     (t.y > pos.y + h));
 }
 
-function inTile(pos, mx, my) {
-	return inBox(pos, TILE_SIZE, TILE_SIZE, mx, my);
+function inTile(pos, mouse) {
+	return inBox(pos, TILE_SIZE, TILE_SIZE, mouse);
 }
 
 ////////////////////////////////////////////////////////
@@ -68,7 +69,7 @@ var c = document.getElementById('target');
 var g = c.getContext('2d');
 var gfx = {};
 
-function loadGraphics(images, onready) {
+function loadGraphics(onready, images) {
 	var pending = images.length;
 	images.forEach(function(i) {
 		gfx[i] = new Image();
@@ -145,7 +146,7 @@ function drawTile(t, pos) {
 		g.stroke();
 
 		if (t != null && pos && canAttack(t)) {
-			var defense = defenseAround(gameState.board, pos);
+			var defense = defenseAround(gameState().board, pos);
 			if (defense > 0) { drawInfo(defense, t.team); }
 		}
 	}
@@ -213,9 +214,9 @@ function drawOne(background, t, pos) {
 	g.restore();
 };
 
-function drawBoard(gameState) {
-	forBoard(gameState.board, drawOne.bind(this, true));
-	forBoard(gameState.board, drawOne.bind(this, false));
+function drawBoard(state) {
+	forBoard(state.board, drawOne.bind(this, true));
+	forBoard(state.board, drawOne.bind(this, false));
 }
 
 function getHandPosition(team, index) {
@@ -236,8 +237,8 @@ function getHandPosition(team, index) {
 	return r;
 }
 
-function drawHand(gameState, team) {
-	gameState.hands[team].forEach(function(x, i) {
+function drawHand(state, team) {
+	state.hands[team].forEach(function(x, i) {
 		g.save();
 		var tpos = getHandPosition(team, i);
 		g.translate(tpos.x, tpos.y);
@@ -248,28 +249,45 @@ function drawHand(gameState, team) {
 	g.save();
 	var spos = getHandPosition(team, 6);
 	g.translate(spos.x, spos.y - TILE_SIZE);
-	drawInfo(score(gameState.board, team), team);
+	drawInfo(score(state.board, team), team);
 	g.restore();
 }
+
+function drawButton(img, p, color) {
+	g.fillStyle = color;
+	g.fillRect(p.x, p.y, 64, 64);
+	drawRotated(img, 0, 0, 64, 64, p.x, p.y);
+}
+
+function getUndoPosition() { return getBoardPosition(pos(0,         -1.25)); }
+function getRedoPosition() { return getBoardPosition(pos(BOARD_X-1, -1.25)); }
 
 function drawGame() {
 	g.fillStyle = 'white';
 	g.fillRect(0, 0, SIZE_X, SIZE_Y);
 
-	drawBoard(gameState);
-	drawHand(gameState, 'red');
-	drawHand(gameState, 'blue');
+	drawBoard(gameState());
+	drawHand(gameState(), 'red');
+	drawHand(gameState(), 'blue');
+
+	if (gameState().mode == 'blue_turn' && ai.name != 'Blue') { return; }
+
+	drawButton('undo.png', getUndoPosition(), historyCursor > 0                      ? tileColor : backColor);
+	drawButton('redo.png', getRedoPosition(), historyCursor < gameHistory.length - 1 ? tileColor : backColor);
 
 	if (selectedTile) {
 		g.save();
-		g.translate(mouseX - selectedX, mouseY - selectedY);
+		g.translate(
+			mousePos.x - selectedX,
+			mousePos.y - selectedY
+		);
 		drawTile(selectedTile);
 		g.restore();
 	}
 }
 
 function repaint() {
-	gameMachine[gameState.mode]['draw']();
+	stateFunc('draw')();
 }
 
 ////////////////////////////////////////////////////////
@@ -433,6 +451,12 @@ function defenseAround(board, pos) {
 }
 
 function evaluateMove(state, tile, pos) {
+	// remove the tile from the player's hand:
+	var tileIndex = state.hands[tile.team].indexOf(tile);
+	if (tileIndex < 0) { throw new Error("bogus tile selected to move."); }
+	state.hands[tile.team][tileIndex] = null;
+
+	// play the tile:
 	set(state.board, pos, tile);
 
 	// clear any existing exclusion zone:
@@ -484,16 +508,21 @@ function evaluateMove(state, tile, pos) {
 }
 
 function playMove(tile, pos) {
-	prevMove  = { tile: tile, pos: pos };
-	prevState = copyState(gameState);
-	gameState = evaluateMove(gameState, tile, pos);
+	recordMove(
+		evaluateMove(copyState(gameState()), tile, pos),
+		{ tile: tile, pos: pos }
+	);
 
 	// advance the state machine:
-	if (isGameOver(gameState)) {
-		gameState = stepTo('end_anim', gameState);
+	if (isGameOver(gameState())) {
+		recordMove(
+			stepTo('end_anim', gameState())
+		);
 	}
 	else {
-		gameState = gameMachine[gameState.mode]['next'](gameState);
+		recordMove(
+			stateFunc('next')(gameState())
+		);
 	}
 }
 
@@ -517,9 +546,9 @@ function drawTween() {
 
 	g.fillStyle = 'white';
 	g.fillRect(0, 0, SIZE_X, SIZE_Y);
-	drawHand(gameState, 'red');
-	drawHand(gameState, 'blue');
-	forBoard(gameState.board, drawOne.bind(this, true));
+	drawHand(gameState(), 'red');
+	drawHand(gameState(), 'blue');
+	forBoard(gameState().board, drawOne.bind(this, true));
 
 	function drawTile(tile, pos) {
 		if (tile != null && tile.isBlock) { return; }
@@ -527,18 +556,18 @@ function drawTween() {
 	}
 
 	if (tweenPercent < .5) {
-		forBoard(prevState.board, function(t, pos) {
+		forBoard(prevState().board, function(t, pos) {
 			var old    = t;
-			var now    = get(gameState.board, pos);
+			var now    = get(gameState().board, pos);
 			var dead   = (now == null) || (now.isBlock);
-			var fizzle = poseq(pos, prevMove.pos) && dead;
+			var fizzle = poseq(pos, prevMove().pos) && dead;
 			var killed = (old != null) && (!old.isBlock) && dead;
 
 			if (fizzle || killed) {
 				// destroyed tiles are faded out
 				g.save();
 				g.globalAlpha = (1 - tweenPercent * 2);
-				drawTile(old || prevMove.tile, pos);
+				drawTile(old || prevMove().tile, pos);
 				g.restore();
 			}
 			else {
@@ -549,7 +578,7 @@ function drawTween() {
 	}
 	else {
 		// fade up blocks
-		forBoard(gameState.board, function(t, pos) {
+		forBoard(gameState().board, function(t, pos) {
 			g.save();
 			if (t != null && t.isBlock) {
 				g.globalAlpha = (tweenPercent - .5) * 2;
@@ -565,7 +594,7 @@ function drawTween() {
 	}
 	else {
 		tweening = false;
-		gameMachine[gameState.mode]['next'](gameState);
+		recordMove(stateFunc('next')(gameState()));
 	}
 }
 
@@ -627,8 +656,7 @@ var selectedTile = null;
 var selectedX = -1;
 var selectedY = -1;
 var originalIndex = -1;
-var mouseX = -1;
-var mouseY = -1;
+var mousePos = pos(-1, -1);
 
 function mouseMove(event) {
 	if (event.targetTouches) {
@@ -639,11 +667,13 @@ function mouseMove(event) {
 		if (!event) { return; }
 	}
 	var rect = c.getBoundingClientRect();
-	mouseX = event.clientX - rect.left;
-	mouseY = event.clientY - rect.top;
-	if (gameMachine[gameState.mode]['click'] && !tweening); { repaint(); }
+	mousePos = pos(
+		event.clientX - rect.left,
+		event.clientY - rect.top
+	);
+	if (stateFunc('click') && !tweening); { repaint(); }
 	if (!selectedTile) { return; }
-	var handler = gameMachine[gameState.mode]['drag'];
+	var handler = stateFunc('drag');
 	if (handler) { handler(); }
 	if (!tweening) { repaint(); }
 }
@@ -653,7 +683,7 @@ function mouseDown(event)  {
 	dragging = true;
 	mouseMove(event);
 	if (!selectedTile) {
-		var handler = gameMachine[gameState.mode]['grab'];
+		var handler = stateFunc('grab');
 		if (handler) { handler(); }
 		if (!tweening) { repaint(); }
 	}
@@ -662,12 +692,12 @@ function mouseDown(event)  {
 function mouseUp(event) {
 	dragging = false;
 	mouseMove(event);
-	var clicker = gameMachine[gameState.mode]['click'];
+	var clicker = stateFunc('click');
 	if (clicker) {
-		clicker(gameState);
+		clicker(gameState());
 	}
 	if (selectedTile) {
-		var handler = gameMachine[gameState.mode]['drop'];
+		var handler = stateFunc('drop');
 		if (handler) { handler(); }
 	}
 	if (!tweening) { repaint(); }
@@ -686,32 +716,33 @@ function inputHandlers() {
 }
 
 function grab(team) {
-	gameState.hands[team].forEach(function (x, i) {
+	gameState().hands[team].forEach(function (x, i) {
 		if (x == null || selectedTile) { return; }
 		var pos = getHandPosition(team, i);
-		if (inTile(pos, mouseX, mouseY)) {
+		if (inTile(pos, mousePos)) {
 			selectedTile = x;
 			originalIndex = i;
-			selectedX = mouseX - pos.x;
-			selectedY = mouseY - pos.y;
-			gameState.hands[team][i] = null;
+			selectedX = mousePos.x - pos.x;
+			selectedY = mousePos.y - pos.y;
+			gameState().hands[team][i] = null;
 		}
 	});
 }
 
 function drop(team) {
-	forBoard(gameState.board, function(t, pos) {
+	forBoard(gameState().board, function(t, pos) {
 		if (t != null) { return; }
-		if (inTile(getBoardPosition(pos), mouseX, mouseY)) {
+		if (inTile(getBoardPosition(pos), mousePos)) {
+			gameState().hands[team][originalIndex] = selectedTile;
 			playMove(selectedTile, pos);
 			selectedTile = null;
 		}
 	});
-	if (inTile(getHandPosition(team, originalIndex), mouseX, mouseY)) {
+	if (inTile(getHandPosition(team, originalIndex), mousePos)) {
 		selectedTile.rot = (selectedTile.rot + 1) % 4;
 	}
 	if (selectedTile) {
-		gameState.hands[team][originalIndex] = selectedTile;
+		gameState().hands[team][originalIndex] = selectedTile;
 		selectedTile = null;
 	}
 }
@@ -753,7 +784,7 @@ function drawOpponentMenu() {
 		var p = getOpponentPosition(i);
 		g.translate(p.x, p.y);
 
-		var over = inBox(p, OPP_BUTTON_W, OPP_BUTTON_H, mouseX, mouseY);
+		var over = inBox(p, OPP_BUTTON_W, OPP_BUTTON_H, mousePos);
 
 		g.beginPath();
 		g.fillStyle = over ? tileHighlight : tileColor;
@@ -779,20 +810,50 @@ function drawOpponentMenu() {
 
 ////////////////////////////////////////////////////////
 //
-//  Main Program
+//  History
 //
 ////////////////////////////////////////////////////////
 
-var prevState = null;
-var prevMove  = null;
-var gameState = {
-	mode: 'opp_menu',
-	board: newBoard(),
-	hands: {
-		'red'  : newTiles('red'),
-		'blue' : newTiles('blue'),
+var gameHistory = [
+	{
+		state: {
+			mode: 'opp_menu',
+			board: newBoard(),
+			hands: {
+				'red'  : newTiles('red'),
+				'blue' : newTiles('blue'),
+			},
+		},
+		move: null,
 	},
-};
+];
+var historyCursor = 0;
+
+function gameState() { return gameHistory[historyCursor].state; }
+function prevMove()  { return gameHistory[historyCursor].move;  }
+function prevState() { return (historyCursor == 0) ? null : gameHistory[historyCursor-1].state; }
+
+function stateFunc(name) {
+	return gameMachine[gameState().mode][name];
+}
+
+function recordMove(newState, move) {
+	if (!move) {
+		if (typeof newState == 'function') {
+			console.log(newState);
+			throw new Error("WTF");
+		}
+		gameHistory[historyCursor].state = newState;
+	}
+	else {
+		gameHistory = gameHistory.slice(0, historyCursor+1);
+		gameHistory.push({
+			state : newState,
+			move  : move,
+		});
+		historyCursor++;
+	}
+}
 
 function stepTo(mode, state) {
 	state.mode = mode;
@@ -802,6 +863,23 @@ function stepTo(mode, state) {
 	return state;
 }
 
+function undoStep() { return ai.name == 'Blue' ? 1 : 2; }
+function undoMove() { historyCursor = Math.max(historyCursor - undoStep(), 0); }
+function redoMove() { historyCursor = Math.min(historyCursor + undoStep(), gameHistory.length - 1); }
+
+function clickUndoRedo() {
+	if (inTile(getUndoPosition(), mousePos)) { undoMove(); }
+	if (inTile(getRedoPosition(), mousePos)) { redoMove(); }
+}
+
+////////////////////////////////////////////////////////
+//
+//  Main Program
+//
+////////////////////////////////////////////////////////
+
+
+
 var gameMachine = {
 	'opp_menu' : {
 		draw: function() {
@@ -810,7 +888,7 @@ var gameMachine = {
 		},
 		click: function(state) {
 			opponents.forEach(function(o, i) {
-				if (inBox(getOpponentPosition(i), OPP_BUTTON_W, OPP_BUTTON_H, mouseX, mouseY)) {
+				if (inBox(getOpponentPosition(i), OPP_BUTTON_W, OPP_BUTTON_H, mousePos)) {
 					if (o.name == 'Human') {
 						o.name = 'Blue';
 						gameMachine['red_turn'].draw = function(){ drawGame(); drawHeading("Red's Turn"); }
@@ -831,6 +909,7 @@ var gameMachine = {
 			drawGame();
 			drawHeading("Player's Turn");
 		},
+		click: clickUndoRedo,
 		next: stepTo.bind(this, 'red_anim'),
 	},
 	'red_anim' : {
@@ -842,9 +921,6 @@ var gameMachine = {
 		init: function(state) {
 			window.setTimeout(function() {
 				var move = ai.decide(state);
-				var tileIndex = state.hands['blue'].indexOf(move.tile);
-				if (tileIndex < 0) { throw new Error("bogus tile selected by AI."); }
-				state.hands['blue'][tileIndex] = null;
 				playMove(move.tile, pos(move.x, move.y));
 			}, 1500);
 			return state;
@@ -853,6 +929,7 @@ var gameMachine = {
 			drawGame();
 			drawHeading(ai.name + "'s Turn");
 		},
+		click: clickUndoRedo,
 		next: stepTo.bind(this, 'blue_anim'),
 	},
 	'blue_anim' : {
@@ -869,8 +946,8 @@ var gameMachine = {
 		init: repaint,
 		draw: function() {
 			drawGame();
-			var red  = score(gameState.board, 'red');
-			var blue = score(gameState.board, 'blue');
+			var red  = score(gameState().board, 'red');
+			var blue = score(gameState().board, 'blue');
 			if (red == blue) {
 				drawHeading("The game is a draw.");
 			}
@@ -887,4 +964,8 @@ function init() {
 	repaint();
 }
 
-loadGraphics(['icons.png'], init);
+loadGraphics(init, [
+	'icons.png',
+	'undo.png',
+	'redo.png',
+]);
