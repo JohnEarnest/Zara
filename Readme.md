@@ -1,6 +1,6 @@
 Zara
 ====
-![Title Image](https://raw.githubusercontent.com/JohnEarnest/Zara/master/images/screenshot.png)
+![Title Image](https://raw.githubusercontent.com/JohnEarnest/Zara/master/images/screenshot.gif)
 
 [Try it here!](http://johnearnest.github.io/Zara/) This game is a browser-based reimplementation of a 1996 shareware title called [Zarathustra](http://www.markressler.com/doc/Zarathustra-Game-Rules.pdf) by Mark Ressler. From the [original website](http://members.aol.com/deadmanx/zarathustra.html):
 
